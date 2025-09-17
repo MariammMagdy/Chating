@@ -25,5 +25,5 @@ This project demonstrates professional backend skills including authentication, 
 
 ---
 
-## 📂 Project Structure
+
 
