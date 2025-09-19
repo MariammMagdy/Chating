@@ -1,0 +1,3 @@
+Hello
+"test": "echo \"Error: no test specified\" && exit 1",
+mongodb://127.0.0.1:27017/chatapp
