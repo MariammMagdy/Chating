@@ -2,6 +2,7 @@ const express = require('express');
 const dotenv = require('dotenv');
 const morgan = require('morgan');
 dotenv.config({ path: 'config.env' });
+const globalError = require("./middleware/errorMiddleware");
 const dbConnection = require('./config/database');
 
 // connect with db
