@@ -1,70 +1,150 @@
 const asyncHandler = require("express-async-handler");
 const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const User = require("../models/userModel");
 const ApiError = require("../utils/apiError");
 const createToken = require("../utils/createToken");
+const User = require("../models/userModel");
+const { sanitizeUser, sanitizeUsers } = require("../utils/sanitizeData");
 
-// 🟢 Create JWT
-/*const createToken = (id) => {
-    return jwt.sign({ id }, process.env.JWT_SECRET, {
-        expiresIn: process.env.JWT_EXPIRE_TIME,
-    });
-};*/
 
-// 🟢 Register user
-exports.registerUser = asyncHandler(async (req, res, next) => {
-    const { userName, email, dateOfBirth, gender, password } = req.body;
 
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-        return next(new ApiError("Email already exists", 400));
+// @desc    Get specific user by id
+// @route   GET /api/v1/users/:id
+// @access  Private/Admin
+exports.getUser = asyncHandler(async (req, res, next) => {
+    const { id } = req.params; // جلب الـ ID من الرابط
+    const document = await User.findById(id); // البحث عن المستخدم باستخدام الـ ID
+
+    if (!document) {
+        // إذا ما كانش في مستخدم بالـ ID ده
+        return next(new ApiError(`No document for this id ${id}`, 404));
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    // إرجاع البيانات للمستخدم بعد ما ننظفها باستخدام sanitizeUser
+    res.status(200).json({ data: sanitizeUser(document) });
+});
 
-    const user = await User.create({
+// @desc    Get information of logged user
+// @route   GET /users/getMe
+// @access  Private/user
+
+exports.getLoggedUserData = asyncHandler(async (req, res, next) => {
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+        return next(new ApiError(`No user found with id ${req.user.id}`, 404));
+    }
+
+    res.status(200).json({ data: sanitizeUser(user) });
+});
+
+// @desc    Get all users
+// @route   GET /users/all
+// @access  Private/user
+
+exports.getAllUsers = asyncHandler(async (req, res, next) => {
+    const users = await User.find();
+    if (!users.length) {
+        return next(new ApiError(`No users found`, 404));
+    }
+    res.status(200).json({ results: users.length, data: sanitizeUsers(users) });
+});
+
+exports.getAllAdmins = asyncHandler(async (req, res, next) => {
+    const users = await User.aggregate([
+    {
+        $match: {
+            role: "admin", // تحديد فقط المستخدمين الذين لديهم الدور "user"
+        },
+    },
+    {
+        $project: {
+            UserName: 1,
+            //Phone: 1,
+            Email: 1,
+            _id: 1,
+        },
+    },
+    ]);
+
+    if (!users.length) {
+        return next(new ApiError(`No users found`, 404));
+    }
+
+    res.status(200).json({ results: users.length, data: users });
+});
+
+// @desc    Create user
+// @route   POST  /api/v1/users
+// @access  Private/Admin
+exports.createUser = (User) =>
+    asyncHandler(async (req, res) => {
+        const {
+            //name,
+            userName,
+            email,
+            //phoneNumber,
+            dateOfBirth,
+            gender,
+            password,
+        } = req.body;
+
+        const newUser = await User.create({
+            //name,
+            userName,
+            email,
+            //phoneNumber,
+            dateOfBirth,
+            gender,
+            password,
+        });
+        console.log(newUser);
+        res.status(201).json({ data: newUser });
+    });
+
+// @desc    Update specific user
+// @route   PUT /api/v1/users/:id
+// @access  Private/Admin
+
+exports.CreateAdmin = asyncHandler(async (req, res, next) => {
+    const { userName, Email, password, /*Phone*/ } = req.body;
+    const saltRounds = parseInt(process.env.HASH_PASS, 10); // عدد الـ salt rounds من البيئة
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    const admin = await User.create({
         userName,
-        email,
-        dateOfBirth,
-        gender,
+        Email,
         password: hashedPassword,
+        //Phone,
+        role: "admin",
     });
-
-    const token = createToken(user._id);
-    res.status(201).json({
-        status: "success",
-        token,
-        data: { userName: user.userName, email: user.email },
-    });
+    const token = createToken(admin._id);
+    res.status(201).json({ data: admin, token });
 });
 
-// 🟢 Login user
-exports.loginUser = asyncHandler(async (req, res, next) => {
-    const { email, password } = req.body;
+exports.deleteUserAndAdmin = asyncHandler(async (req, res, next) => {
+    const user = await User.findByIdAndDelete(req.params.id);
+    if (!user) {
+        return next(new ApiError(`No user for this id ${req.params.id}`, 404));
+    }
 
-    const user = await User.findOne({ email }).select("+password");
-    if (!user) return next(new ApiError("Invalid email or password", 401));
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return next(new ApiError("Invalid email or password", 401));
-
-    const token = createToken(user._id);
-    res.status(200).json({ status: "success", token });
+    res.status(204).json({ msg: "Deleted" });
 });
 
-// 🟢 Get logged in user (from token)
-exports.getLoggedUser = asyncHandler(async (req, res, next) => {
-    const user = await User.findById(req.user._id);
-    if (!user) return next(new ApiError("User not found", 404));
-
-    res.status(200).json({ data: user });
-});
-
-// 🟢 Update logged in user
-exports.updateLoggedUser = asyncHandler(async (req, res, next) => {
-    const allowedFields = ["userName", "email", "dateOfBirth", "gender"];
+// @desc    Update user without password or role
+// @route   PUT /users/updateMe
+// @access  Private/user
+exports.updateUser = asyncHandler(async (req, res, next) => {
     const updateData = {};
+
+    // خدي الحقول اللي موجودة فعلاً في الـ req.body
+    const allowedFields = [
+        //"name",
+        "userName",
+        //"phoneNumber",
+        "dateOfBirth",
+        "gender",
+        "email",
+        "password",
+    ];
 
     allowedFields.forEach((field) => {
         if (req.body[field] !== undefined) {
@@ -72,44 +152,114 @@ exports.updateLoggedUser = asyncHandler(async (req, res, next) => {
         }
     });
 
-    const user = await User.findByIdAndUpdate(req.user._id, updateData, {
+    const user = await User.findByIdAndUpdate(req.params.id, updateData, {
         new: true,
-        runValidators: true,
     });
 
-    if (!user) return next(new ApiError("User not found", 404));
+    if (!user) {
+        return next(new ApiError(`No user for this id ${req.params.id}`, 404));
+    }
 
-    res.status(200).json({ status: "success", data: user });
+    res.status(200).json({ data: sanitizeUser(user) });
 });
 
-// 🟢 Update password
-exports.updatePassword = asyncHandler(async (req, res, next) => {
-    const { oldPassword, newPassword } = req.body;
+// @desc    Update user  role
+// @route   PUT /users/updateRole/:id
+// @access  Private/admin
 
-    const user = await User.findById(req.user._id).select("+password");
-    if (!user) return next(new ApiError("User not found", 404));
+exports.updateUserRole = asyncHandler(async (req, res, next) => {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+        return next(new ApiError(`No user for this id ${req.params.id}`, 404));
+    }
 
-    const isMatch = await bcrypt.compare(oldPassword, user.password);
-    if (!isMatch) return next(new ApiError("Incorrect old password", 401));
+    const newRole = user.role === "admin" ? "user" : "admin";
+    await User.findByIdAndUpdate(req.params.id,{role: newRole,},{new: true,});
 
-    user.password = await bcrypt.hash(newPassword, 12);
-    user.passwordChangedAt = Date.now();
-    await user.save();
-
-    const token = createToken(user._id);
-    res.status(200).json({ msg: "Password updated successfully", token });
+    res.status(204).json({ msg: "Role updated" });
 });
 
-// 🟢 Deactivate user
-exports.deactivateUser = asyncHandler(async (req, res, next) => {
-    await User.findByIdAndUpdate(req.user._id, { active: false }, { new: true });
-    res.status(200).json({ msg: "User deactivated" });
+// @desc    Deactvate logged user
+// @route   PUT /users/deactvateMe
+// @access  Private/protect
+
+exports.deactivateLoggedUser = asyncHandler(async (req, res, next) => {
+    await User.findByIdAndUpdate(req.user._id,{active: false,},{new: true,});
+
+    res.status(204).json({ message: "Deactivated" });
 });
 
-// 🟢 Delete user
+// @desc    Reactivate a user
+// @route   PUT /users/reactivate/:id
+// @access  Private/admin
+exports.reactivateUser = asyncHandler(async (req, res, next) => {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+        return next(new ApiError(`No user found with id ${req.params.id}`, 404));
+    }
+
+    await User.findByIdAndUpdate(req.params.id, { active: true }, { new: true });
+
+    res.status(200).json({ msg: "User reactivated" });
+});
+
+// @desc    Get all deactivated users
+// @route   GET /users/deactivated
+// @access  Private/admin
+exports.getDeactivatedUsers = asyncHandler(async (req, res, next) => {
+    const users = await User.find({ active: false });
+    if (!users.length) {
+        return next(new ApiError(`No deactivated users found`, 404));
+    }
+    res.status(200).json({ results: users.length, data: sanitizeUsers(users) });
+});
+
+// @desc    Delete logged user
+// @route   DELETE /users/deleteMyAccount
+// @access  Private/protect
+
 exports.deleteLoggedUser = asyncHandler(async (req, res, next) => {
     const user = await User.findByIdAndDelete(req.user._id);
-    if (!user) return next(new ApiError("User not found", 404));
 
-    res.status(200).json({ msg: "Account deleted successfully" });
+    if (!user) {
+        return next(new ApiError("No user found", 404));
+    }
+
+    return res.status(200).json({
+        status: "success",
+        msg: `${user.userName} deleted successfully.`,
+    });
+});
+
+exports.updateUserPassword = asyncHandler(async (req, res, next) => {
+    const user = await User.findById(req.user._id).select("+password");
+
+    if (!user) {
+        return next(new ApiError("User not found", 404));
+    }
+
+    const { oldPassword, newPassword } = req.body;
+
+    // التحقق من كلمة المرور القديمة
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch) {
+        return next(new ApiError("Incorrect old password", 401));
+    }
+
+    // تحديث كلمة المرور
+    const saltRounds = parseInt(process.env.HASH_PASS, 10);
+    user.password = await bcrypt.hash(newPassword, saltRounds);
+
+    // تحديث passwordChangeAt
+    user.passwordChangeAt = Date.now();
+
+    await user.save();
+
+    // إنشاء توكن جديد بعد تحديث كلمة المرور
+    const token = createToken(user._id);
+
+    res.status(200).json({
+        msg: "Password updated successfully",
+        token,
+    });
 });

@@ -34,6 +34,19 @@ const userSchema = new mongoose.Schema(
             minlength: 8,
             select: false, // ميظهرش في الـ queries
         },
+        online: { 
+            type: Boolean,
+            default: false 
+        },
+        lastSeen: {
+            type: Date,
+        },
+        role: {
+            type: String,
+            enum: ["user", "group admin", "admin"],
+            default: "user",
+            select: false, // لو فيه هذا السطر لازم تعمل .select("+role")
+        },
         fcmToken: {
             type: [String],
             default: [],
