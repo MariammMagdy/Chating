@@ -5,6 +5,7 @@ const compression = require("compression");
 dotenv.config({ path: 'config.env' });
 const globalError = require("./middleware/errorMiddleware");
 const dbConnection = require('./config/database');
+const mountRoutes = require("./routes/index");
 
 // Routes
 const userRoute = require("./routes/userRoute");
@@ -55,7 +56,7 @@ mountRoutes(app);
 app.use("/api/v1/chat/users", userRoute);
 app.use("/api/v1/chat/auth", authRoute);
 
-app.all("*", (req, res, next) => {
+app.use((req, res, next) => {
     next(new ApiError(`Can't find this route: ${req.originalUrl}`, 400));
 });
 app.use(globalError);

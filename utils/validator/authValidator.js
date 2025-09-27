@@ -53,10 +53,10 @@ exports.signupValidator = [
             }
         return true;
         }),
-    check("phoneNumber")
+    /*check("phoneNumber")
         .notEmpty()
         //.isEmpty()
-        .withMessage("Phone is required"),
+        .withMessage("Phone is required"),*/
   //.isMobilePhone("ar-EG") // يسمح فقط بالأرقام المصرية
   /*.withMessage(
       "Invalid phone number. Only Egyptian phone numbers are accepted."
