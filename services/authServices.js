@@ -148,7 +148,7 @@ exports.verifyEmailUser = asyncHandler(async (req, res, next) => {
 
 // ============== LOGIN ==============
 exports.login = asyncHandler(async (req, res, next) => {
-    const user = await User.findOne({ email: req.body.email });
+    const user = await User.findOne({ email: req.body.email }).select("+password");
 
     if (!user || !(await bcrypt.compare(req.body.password, user.password))) {
         return next(new ApiError("Incorrect email or password", 401));
