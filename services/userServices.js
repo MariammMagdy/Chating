@@ -88,6 +88,12 @@ exports.createUser = (User) =>
             password,
         } = req.body;
 
+        // هات عدد الـ salt rounds من env
+        const saltRounds = parseInt(process.env.HASH_PASS, 10) || 12;
+
+        // hash الباسورد
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+
         const newUser = await User.create({
             //name,
             userName,
@@ -95,10 +101,14 @@ exports.createUser = (User) =>
             //phoneNumber,
             dateOfBirth,
             gender,
-            password,
+            password: hashedPassword ,
         });
+
+        // رجع token زي signup
+        const token = createToken(newUser._id);
+
         console.log(newUser);
-        res.status(201).json({ data: newUser });
+        res.status(201).json({ status: "sucess", data: newUser, token });
     });
 
 // @desc    Update specific user
@@ -106,18 +116,18 @@ exports.createUser = (User) =>
 // @access  Private/Admin
 
 exports.CreateAdmin = asyncHandler(async (req, res, next) => {
-    const { userName, Email, password, /*Phone*/ } = req.body;
+    const { userName, email, password, /*Phone*/ } = req.body;
     const saltRounds = parseInt(process.env.HASH_PASS, 10); // عدد الـ salt rounds من البيئة
     const hashedPassword = await bcrypt.hash(password, saltRounds);
     const admin = await User.create({
         userName,
-        Email,
+        email,
         password: hashedPassword,
         //Phone,
         role: "admin",
     });
     const token = createToken(admin._id);
-    res.status(201).json({ data: admin, token });
+    res.status(201).json({ status: "sucess", data: admin, token });
 });
 
 exports.deleteUserAndAdmin = asyncHandler(async (req, res, next) => {
