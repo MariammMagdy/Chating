@@ -3,6 +3,7 @@ const dotenv = require('dotenv');
 const morgan = require('morgan');
 const compression = require("compression");
 dotenv.config({ path: 'config.env' });
+const ApiError = require("./utils/apiError");
 const globalError = require("./middleware/errorMiddleware");
 const dbConnection = require('./config/database');
 const mountRoutes = require("./routes/index");

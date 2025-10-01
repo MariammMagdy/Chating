@@ -42,10 +42,10 @@ router.put(
     updateUser
 );
 
-router.get("/getMe/:id", getLoggedUserData);
+router.get("/getMe", getLoggedUserData);
 router.put("/deactivateMe", deactivateLoggedUser);
 router.put("/reactivateMe/:id", idUserValidator, reactivateUser);
-router.delete("/deleteMe/:id", deleteLoggedUser);
+router.delete("/deleteMe", deleteLoggedUser);
 router.put("/updateUserPassword", updateUserPassword);
 
 //-------------------only for admin ---------------------
