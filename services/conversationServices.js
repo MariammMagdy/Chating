@@ -22,10 +22,6 @@ const checkIsGroupAdmin = (conv, userId, next) => {
 exports.createPrivateConversation = asyncHandler(async (req, res, next) => {
     const { userId } = req.body; // ده الـ user اللي عايز تبدأ معاه محادثة
 
-    if (!userId) {
-        return next(new ApiError("UserId is required", 400));
-    }
-
     // validate user exists
     const user = await User.findById(userId);
     if (!user) {
@@ -60,14 +56,6 @@ exports.createPrivateConversation = asyncHandler(async (req, res, next) => {
 exports.createGroupConversation = asyncHandler(async (req, res, next) => {
     const { users, name } = req.body;
 
-    if (!users || users.length < 2) {
-        return next(new ApiError("A group must have at least 2 users + you", 400));
-    }
-
-    if (!name) {
-        return next(new ApiError("Group name is required", 400));
-    }
-
     // Add the creator automatically
     const allUsers = [...users, req.user._id];
 
@@ -88,7 +76,58 @@ exports.createGroupConversation = asyncHandler(async (req, res, next) => {
     });
 });
 
-// @desc    Get a conversation by Id
+// @desc    Get all conversations for the logged user
+// @route   GET /conversations
+// @access  Private
+exports.getUserConversations = asyncHandler(async (req, res, next) => {
+    const { page = 1, limit = 20 } = req.query;
+    const skip = (page - 1) * limit;
+
+    const conversations = await Conversation.find({ users: req.user._id })
+        .sort({ lastMessageAt: -1, updatedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("users", "userName")
+        .populate({ path: "lastMessage", select: "content sender createdAt" })
+        .lean();
+
+    res.status(200).json({
+        status: "success",
+        results: conversations.length,
+        data: conversations,
+    });
+});
+
+// @desc    Get single conversation by ID
+// @route   GET /conversations/:id
+// @access  Private
+exports.getConversationById = asyncHandler(async (req, res, next) => {
+    const { id } = req.params;
+
+    const conversation = await Conversation.findById(id)
+        .populate("users", "userName")
+        .populate({ path: "lastMessage", select: "content sender createdAt" });
+
+    if (!conversation) {
+        return next(new ApiError(`No Conversation found for this id: ${id}`, 404));
+    }
+
+    // تأكد إن اليوزر مشارك في المحادثة
+    const isParticipant = conversation.users.some(
+        (u) => u._id.toString() === req.user._id.toString()
+    );
+
+    if (!isParticipant) {
+        return next(new ApiError("Not authorized to view this conversation", 403));
+    }
+
+    res.status(200).json({
+        status: "success",
+        data: conversation,
+    });
+});
+
+/*// @desc    Get a conversation by Id
 // @route   GET /api/v1/conversations/:convId
 // @access  Private/protect
 exports.getConversationById = asyncHandler(async (req, res, next) => {
@@ -110,7 +149,7 @@ exports.getConversationById = asyncHandler(async (req, res, next) => {
     }
 
     res.status(200).json({ status: "success", data: conv });
-});
+});*/
 
 // @desc    Rename group conversation
 // @route   PATCH /api/v1/conversations/:id/rename
@@ -118,10 +157,6 @@ exports.getConversationById = asyncHandler(async (req, res, next) => {
 exports.renameGroup = asyncHandler(async (req, res, next) => {
     const { id } = req.params;
     const { name } = req.body;
-
-    if (!name) {
-        return next(new ApiError("Group name is required", 400));
-    }
 
     const conv = await Conversation.findById(id);
     if (!conv) {
