@@ -8,6 +8,21 @@ const conversationSchema = new mongoose.Schema(
                 required: true 
             }
         ],
+        isGroup: {
+            type: Boolean,
+            default: false,
+        },
+        // لو جروب
+        groupName: {
+            type: String,
+            trim: true,
+        },
+        groupAdmins: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "User",
+            },
+        ],
         // optional fields for quick UI
         lastMessage: { 
             type: mongoose.Schema.Types.ObjectId, 
@@ -17,11 +32,19 @@ const conversationSchema = new mongoose.Schema(
             type: Date 
         }
     },
-    { timestamps: true, discriminatorKey: "chatType"}
+    { timestamps: true }
 );
 
 // index للبحث السريع عن محادثات لمستخدم
 conversationSchema.index({ users: 1 });
+
+// Virtual populate: كل الرسائل التابعة للمحادثة
+conversationSchema.virtual("messages", {
+    ref: "Message",
+    foreignField: "conversation",
+    localField: "_id",
+});
+
 
 module.exports = mongoose.model("Conversation", conversationSchema);
 

@@ -66,4 +66,11 @@ const userSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+// Virtual populate: conversations اللي المستخدم فيها
+userSchema.virtual("conversations", {
+    ref: "Conversation",
+    foreignField: "users",
+    localField: "_id",
+});
+
 module.exports = mongoose.model("User", userSchema);

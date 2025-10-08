@@ -7,7 +7,7 @@ const User = require("../models/userModel");
 
 // helper function للتحقق من صلاحية الأدمن
 const checkIsGroupAdmin = (conv, userId, next) => {
-    const isAdmin = conv.admins.some(
+    const isAdmin = conv.groupAdmins.some(
         (adminId) => adminId.toString() === userId.toString()
     );
     if (!isAdmin) {
@@ -60,7 +60,7 @@ exports.createGroupConversation = asyncHandler(async (req, res, next) => {
     const allUsers = [...users, req.user._id];
 
     const conversation = await Conversation.create({
-        name,
+        groupName,
         users: allUsers,
         isGroup: true,
         groupAdmins: [req.user._id], // creator هو admin
@@ -88,7 +88,14 @@ exports.getUserConversations = asyncHandler(async (req, res, next) => {
         .skip(skip)
         .limit(limit)
         .populate("users", "userName")
-        .populate({ path: "lastMessage", select: "content sender createdAt" })
+        //.populate({ path: "lastMessage", select: "content sender createdAt" })
+        .populate({
+            path: "lastMessage",
+            populate: {
+                path: "sender",
+                select: "userName",
+            },
+        })
         .lean();
 
     res.status(200).json({
@@ -156,7 +163,7 @@ exports.getConversationById = asyncHandler(async (req, res, next) => {
 // @access  Private/protect
 exports.renameGroup = asyncHandler(async (req, res, next) => {
     const { id } = req.params;
-    const { name } = req.body;
+    const { groupName } = req.body;
 
     const conv = await Conversation.findById(id);
     if (!conv) {
@@ -165,7 +172,7 @@ exports.renameGroup = asyncHandler(async (req, res, next) => {
 
     checkIsGroupAdmin(conv, req.user._id, next);
 
-    conv.name = name;
+    conv.groupName = groupName;
     await conv.save();
 
     res.status(200).json({ status: "success", data: conv });
@@ -190,8 +197,8 @@ exports.addGroupAdmin = asyncHandler(async (req, res, next) => {
         return next(new ApiError("User not found", 404));
     }
 
-    if (!conv.admins.includes(userId)) {
-        conv.admins.push(userId);
+    if (!conv.groupAdmins.includes(userId)) {
+        conv.groupAdmins.push(userId);
         await conv.save();
     }
 
@@ -215,11 +222,11 @@ exports.removeGroupAdmin = asyncHandler(async (req, res, next) => {
 
     checkIsGroupAdmin(conv, req.user._id, next);
 
-    conv.admins = conv.admins.filter((a) => a.toString() !== userId.toString());
+    conv.groupAdmins = conv.groupAdmins.filter((a) => a.toString() !== userId.toString());
     await conv.save();
 
     res.status(200).json({ status: "success",
-        msg: `${conv.admins.userName} deleted successfully.`,
+        msg: `${conv.groupAdmins.userName} deleted successfully.`,
         data: conv });
 });
 
