@@ -11,6 +11,8 @@ const mountRoutes = require("./routes/index");
 // Routes
 const userRoute = require("./routes/userRoute");
 const authRoute = require("./routes/authRoute");
+const messageRoute = require("./routes/messageRoute");
+const conversationRoute = require("./routes/conversationRoute");
 
 // connect with db
 dbConnection();
@@ -56,6 +58,8 @@ deleteExpiredVerifications();
 mountRoutes(app);
 app.use("/api/v1/chat/users", userRoute);
 app.use("/api/v1/chat/auth", authRoute);
+app.use("/api/v1/chat/message", messageRoute);
+app.use("/api/v1/chat/conversation", conversationRoute);
 
 app.use((req, res, next) => {
     next(new ApiError(`Can't find this route: ${req.originalUrl}`, 400));
