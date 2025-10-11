@@ -8,6 +8,10 @@ const conversationSchema = new mongoose.Schema(
                 required: true 
             }
         ],
+        participantsKey: { 
+            type: String, 
+            default: null 
+        }, // e.g. "603..._604..."
         isGroup: {
             type: Boolean,
             default: false,
@@ -37,6 +41,12 @@ const conversationSchema = new mongoose.Schema(
 
 // index للبحث السريع عن محادثات لمستخدم
 conversationSchema.index({ users: 1 });
+
+// فريد للـ 1:1 conversations فقط
+conversationSchema.index(
+    { participantsKey: 1 },
+    { unique: true, partialFilterExpression: { isGroup: false } }
+);
 
 // Virtual populate: كل الرسائل التابعة للمحادثة
 conversationSchema.virtual("messages", {

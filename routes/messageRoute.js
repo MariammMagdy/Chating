@@ -17,9 +17,9 @@ const {
     //uploadMedia,
 } = require("../services/messageServices");
 
-const router = express.Router();
-
 const {protect} = require("../services/authServices");
+
+const router = express.Router();
 
 router.use(protect);
 
